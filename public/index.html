@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Derivative of Graphs &mdash; Bui-Xuan et al.</title>
+
+  <!-- Cytoscape.js core + dagre layout -->
+  <script src="https://unpkg.com/cytoscape@3.28.1/dist/cytoscape.min.js"></script>
+  <script src="https://unpkg.com/dagre@0.8.5/dist/dagre.min.js"></script>
+  <script src="https://unpkg.com/cytoscape-dagre@2.5.0/cytoscape-dagre.js"></script>
+
+  <style>
+    /* ===== CSS Variables (dark theme) ===== */
+    :root {
+      --bg-primary:   #0d1117;
+      --bg-secondary: #161b22;
+      --bg-tertiary:  #21262d;
+      --border:       #30363d;
+      --text-primary: #e6edf3;
+      --text-secondary:#8b949e;
+      --accent:       #58a6ff;
+      --accent-hover: #79c0ff;
+      --red:          #f85149;
+      --green:        #3fb950;
+      --yellow:       #d29922;
+      --radius:       8px;
+      --font-mono:    'Cascadia Code', 'Fira Code', 'JetBrains Mono', Consolas, monospace;
+    }
+
+    /* ===== Reset & base ===== */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ===== Header ===== */
+    header {
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border);
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex-shrink: 0;
+    }
+     footer {
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border);
+      padding: 7px 18px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+
+    header h1 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+    header h1 span { color: var(--accent); }
+    header .subtitle {
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+
+    /* ===== Main layout ===== */
+    main {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* ===== Sidebar ===== */
+    aside {
+      width: 320px;
+      min-width: 320px;
+      background: var(--bg-secondary);
+      border-right: 1px solid var(--border);
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    }
+
+    .panel {
+      padding: 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    .panel-title {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: var(--text-secondary);
+      margin-bottom: 12px;
+    }
+
+    /* Form controls */
+    .form-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    .form-row label {
+      font-size: 13px;
+      color: var(--text-secondary);
+      min-width: 90px;
+    }
+    .form-row input[type="number"],
+    .form-row input[type="text"] {
+      flex: 1;
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border);
+      color: var(--text-primary);
+      padding: 6px 10px;
+      border-radius: var(--radius);
+      font-size: 13px;
+      font-family: var(--font-mono);
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .form-row input:focus {
+      border-color: var(--accent);
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      width: 100%;
+      padding: 8px 14px;
+      border-radius: var(--radius);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      border: 1px solid transparent;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .btn-primary {
+      background: var(--accent);
+      color: #0d1117;
+    }
+    .btn-primary:hover { background: var(--accent-hover); }
+    .btn-primary:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+    .btn-secondary {
+      background: var(--bg-tertiary);
+      color: var(--text-primary);
+      border-color: var(--border);
+    }
+    .btn-secondary:hover { border-color: var(--text-secondary); }
+    .btn-secondary:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+
+    .btn-group {
+      display: flex;
+      gap: 8px;
+      margin-top: 4px;
+    }
+
+    /* Info list */
+    .info-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px 12px;
+    }
+    .info-item {
+      display: flex;
+      flex-direction: column;
+    }
+    .info-label {
+      font-size: 11px;
+      color: var(--text-secondary);
+    }
+    .info-value {
+      font-size: 14px;
+      font-family: var(--font-mono);
+      color: var(--text-primary);
+    }
+
+    /* Snapshot bar chart */
+    .snapshot-bars {
+      display: flex;
+      align-items: flex-end;
+      gap: 3px;
+      height: 40px;
+      margin-top: 8px;
+    }
+    .snapshot-bar {
+      flex: 1;
+      background: var(--accent);
+      border-radius: 2px 2px 0 0;
+      min-height: 2px;
+      position: relative;
+      opacity: 0.6;
+      transition: opacity 0.15s;
+    }
+    .snapshot-bar:hover { opacity: 1; }
+    .snapshot-bar-label {
+      position: absolute;
+      bottom: -16px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 9px;
+      color: var(--text-secondary);
+    }
+
+    /* Analysis results */
+    .twin-list {
+      list-style: none;
+      margin-top: 8px;
+    }
+    .twin-list li {
+      font-family: var(--font-mono);
+      font-size: 13px;
+      padding: 4px 8px;
+      background: var(--bg-tertiary);
+      border-radius: 4px;
+      margin-bottom: 4px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .twin-badge {
+      font-size: 10px;
+      padding: 2px 6px;
+      border-radius: 10px;
+      background: var(--green);
+      color: var(--bg-primary);
+      font-weight: 600;
+    }
+    .no-data {
+      font-size: 12px;
+      color: var(--text-secondary);
+      font-style: italic;
+    }
+
+    /* Status indicator */
+    .status-bar {
+      font-size: 11px;
+      color: var(--text-secondary);
+      padding: 8px 16px;
+      border-top: 1px solid var(--border);
+      background: var(--bg-secondary);
+      margin-top: auto;
+    }
+    .status-bar .dot {
+      display: inline-block;
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      margin-right: 6px;
+    }
+    .dot-idle   { background: var(--text-secondary); }
+    .dot-ok     { background: var(--green); }
+    .dot-error  { background: var(--red); }
+
+    /* ===== Graph area ===== */
+    .graph-area {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      overflow: hidden;
+    }
+
+    #cy {
+      flex: 1;
+      background: var(--bg-primary);
+    }
+
+    /* Legend overlay */
+    .legend {
+      position: absolute;
+      bottom: 16px;
+      right: 16px;
+      background: rgba(22, 27, 34, 0.92);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 12px 16px;
+      font-size: 12px;
+      backdrop-filter: blur(8px);
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 4px;
+    }
+    .legend-item:last-child { margin-bottom: 0; }
+    .legend-line {
+      width: 28px;
+      height: 3px;
+      border-radius: 2px;
+    }
+    .legend-line-black {
+      background: #8b949e;
+    }
+    .legend-line-red {
+      background: var(--red);
+      background: repeating-linear-gradient(
+        90deg, var(--red) 0px, var(--red) 6px,
+        transparent 6px, transparent 10px
+      );
+      height: 3px;
+    }
+
+    /* Time axis labels */
+    .time-axis {
+      display: flex;
+      padding: 8px 16px 4px;
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border);
+      min-height: 28px;
+      align-items: center;
+      font-size: 11px;
+      color: var(--text-secondary);
+      gap: 8px;
+    }
+    .time-axis-label {
+      font-family: var(--font-mono);
+      padding: 2px 8px;
+      background: var(--bg-tertiary);
+      border-radius: 4px;
+    }
+
+    /* ===== Upload modal ===== */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.6);
+      z-index: 100;
+      align-items: center;
+      justify-content: center;
+    }
+    .modal-overlay.active { display: flex; }
+    .modal {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      width: 500px;
+      max-width: 90vw;
+      padding: 24px;
+    }
+    .modal h2 {
+      font-size: 16px;
+      margin-bottom: 12px;
+    }
+    .modal textarea {
+      width: 100%;
+      height: 200px;
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border);
+      color: var(--text-primary);
+      font-family: var(--font-mono);
+      font-size: 12px;
+      padding: 10px;
+      border-radius: var(--radius);
+      resize: vertical;
+      outline: none;
+    }
+    .modal textarea:focus { border-color: var(--accent); }
+    .modal .btn-group { margin-top: 12px; }
+
+    /* ===== Scrollbar ===== */
+    ::-webkit-scrollbar { width: 8px; }
+    ::-webkit-scrollbar-track { background: var(--bg-secondary); }
+    ::-webkit-scrollbar-thumb { background: var(--bg-tertiary); border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--border); }
+  </style>
+</head>
+
+<body>
+  <!-- ============ HEADER ============ -->
+  <header>
+    <h1><span>&#x2202;</span> Derivative of Graphs</h1>
+    <span class="subtitle">Interactive visualizer &mdash; Bui-Xuan, Krasnopol, Monasson &amp; Sznajder (2026)</span>
+  </header>
+
+  <!-- ============ MAIN ============ -->
+  <main>
+    <!-- ---- Sidebar ---- -->
+    <aside>
+      <!-- Generate / Upload -->
+      <div class="panel">
+        <div class="panel-title">Temporal Graph</div>
+        <div class="form-row">
+          <label>Nodes |V|</label>
+          <input type="number" id="inp-nodes" value="10" min="2" max="30" />
+        </div>
+        <div class="form-row">
+          <label>Snapshots &tau;</label>
+          <input type="number" id="inp-snapshots" value="5" min="2" max="20" />
+        </div>
+        <div class="form-row">
+          <label>Edge prob.</label>
+          <input type="number" id="inp-edge-prob" value="0.20" min="0" max="1" step="0.05" />
+        </div>
+        <div class="btn-group">
+          <button class="btn btn-primary" id="btn-generate">Generate Random Graph</button>
+        </div>
+        <div class="btn-group" style="margin-top:6px">
+          <button class="btn btn-secondary" id="btn-upload">Upload / Paste JSON</button>
+        </div>
+        <div class="btn-group" style="margin-top:6px">
+          <button class="btn btn-secondary" id="btn-reset" disabled>Reset</button>
+        </div>
+      </div>
+
+      <!-- Differential controls -->
+      <div class="panel">
+        <div class="panel-title">Differential Operator</div>
+        <div class="form-row">
+          <label>Start time <i>t</i></label>
+          <input type="number" id="inp-t" value="0" min="0" />
+        </div>
+        <div class="form-row">
+          <label>Window &Delta;</label>
+          <input type="number" id="inp-delta" value="2" min="1" />
+        </div>
+        <div class="btn-group">
+          <button class="btn btn-primary" id="btn-compute" disabled>Compute Differential</button>
+        </div>
+        <div class="btn-group" style="margin-top:6px">
+          <button class="btn btn-secondary" id="btn-view-snaps" disabled>View All Snapshots</button>
+        </div>
+        <div class="btn-group" style="margin-top:6px">
+          <button class="btn btn-secondary" id="btn-view-expansion" disabled>View G&rarr; (Static Expansion)</button>
+        </div>
+        <div class="btn-group" style="margin-top:6px">
+          <button class="btn btn-secondary" id="btn-analyze" disabled>Run Analysis</button>
+        </div>
+      </div>
+
+      <!-- Graph info -->
+      <div class="panel" id="panel-info" style="display:none">
+        <div class="panel-title">Graph Info</div>
+        <div class="info-grid">
+          <div class="info-item">
+            <span class="info-label">Vertices</span>
+            <span class="info-value" id="info-vertices">&mdash;</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">Lifetime &tau;</span>
+            <span class="info-value" id="info-lifetime">&mdash;</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">Union edges</span>
+            <span class="info-value" id="info-union-edges">&mdash;</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">Diff. nodes</span>
+            <span class="info-value" id="info-diff-nodes">&mdash;</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">Black edges</span>
+            <span class="info-value" id="info-black-edges">&mdash;</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">Red edges</span>
+            <span class="info-value" id="info-red-edges">&mdash;</span>
+          </div>
+        </div>
+        <div id="snapshot-bars-container">
+          <div style="font-size:11px;color:var(--text-secondary);margin-top:12px;margin-bottom:2px">
+            Edges per snapshot
+          </div>
+          <div class="snapshot-bars" id="snapshot-bars"></div>
+        </div>
+      </div>
+
+      <!-- Analysis results -->
+      <div class="panel" id="panel-analysis" style="display:none">
+        <div class="panel-title">Analysis Results</div>
+        <div class="info-grid" style="margin-bottom:10px">
+          <div class="info-item">
+            <span class="info-label">tw(G<sub>&rarr;</sub><sup>t,&Delta;</sup>)</span>
+            <span class="info-value" id="info-tw-current">&mdash;</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">dtw<sub>&Delta;</sub>(G)</span>
+            <span class="info-value" id="info-dtw-delta">&mdash;</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">Max degree (diff.)</span>
+            <span class="info-value" id="info-max-deg">&mdash;</span>
+          </div>
+          <div class="info-item">
+            <span class="info-label">Eternal twin pairs</span>
+            <span class="info-value" id="info-twin-count">&mdash;</span>
+          </div>
+        </div>
+        <div id="tw-per-t-container" style="display:none">
+          <div style="font-size:11px;color:var(--text-secondary);margin-bottom:2px;margin-top:6px">
+            Tree-width per start time <i>t</i>
+          </div>
+          <div class="snapshot-bars" id="tw-bars" style="height:34px"></div>
+        </div>
+        <div style="font-size:11px;color:var(--text-secondary);margin-bottom:4px;margin-top:10px">
+          Eternal Twins
+        </div>
+        <ul class="twin-list" id="twin-list">
+          <li class="no-data">Run analysis to see results</li>
+        </ul>
+      </div>
+
+      <!-- Status bar -->
+      <div class="status-bar" id="status-bar">
+        <span class="dot dot-idle"></span>
+        Ready
+      </div>
+    </aside>
+
+    <!-- ---- Graph area ---- -->
+    <div class="graph-area">
+      <!-- Time axis -->
+      <div class="time-axis" id="time-axis">
+        <span style="color:var(--text-secondary)">Time axis:</span>
+        <span class="no-data" id="time-axis-empty">generate a graph to begin</span>
+      </div>
+
+      <div id="cy"></div>
+
+      <!-- Legend: all-snapshots mode -->
+      <div class="legend" id="legend-snap" style="display:none">
+        <div class="legend-item">
+          <div class="legend-line legend-line-black"></div>
+          <span>Black edge (snapshot adjacency)</span>
+        </div>
+      </div>
+      <!-- Legend: differential mode -->
+      <div class="legend" id="legend-diff" style="display:none">
+        <div class="legend-item">
+          <div class="legend-line legend-line-black"></div>
+          <span>Black edge (snapshot adjacency)</span>
+        </div>
+        <div class="legend-item">
+          <div class="legend-line legend-line-red"></div>
+          <span>Red edge (temporal continuity)</span>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- ============ UPLOAD MODAL ============ -->
+  <div class="modal-overlay" id="modal-upload">
+    <div class="modal">
+      <h2>Import Temporal Graph (JSON)</h2>
+      <p style="font-size:12px;color:var(--text-secondary);margin-bottom:10px">
+        Paste a JSON object with <code>vertices</code> (array of ids) and
+        <code>snapshots</code> (array of edge-lists). Each edge is <code>[u, v]</code>.
+      </p>
+      <textarea id="json-input" spellcheck="false" placeholder='{
+  "vertices": [0, 1, 2, 3, 4],
+  "snapshots": [
+    [[0,1],[1,2]],
+    [[0,1],[2,3],[3,4]],
+    [[1,2],[2,4]]
+  ]
+}'></textarea>
+      <div class="btn-group">
+        <button class="btn btn-primary" id="btn-json-load">Load Graph</button>
+        <button class="btn btn-secondary" id="btn-json-cancel">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+
+<footer style="justify-content: center;">
+  Presented By: Saad AIDDI & Hamza ELOTMANi & EL HOUSSINE BAKHORI
+</footer>
+</html>
